@@ -51,8 +51,12 @@ bun add <package>                # 新增依赖
 docs/
 ├── specs/       # 功能规格（需求确认后）
 ├── tasks/       # 开发任务拆解（Spec approved 后）
+├── design/      # 视觉与交互设计规范
+│   └── tui-visual-design.md   # TUI 色彩、字符、布局视觉规范（权威来源）
 └── decisions/   # 架构决策（可选，高风险变更必填）
 ```
+
+> **UI 实现必读**：涉及颜色、边框样式、消息气泡、字符图标的实现，必须先读 `docs/design/tui-visual-design.md`，Spec 4 只定义布局和交互逻辑，视觉取值以设计文档为准。
 
 ### 命名规范
 
