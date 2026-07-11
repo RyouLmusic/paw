@@ -267,9 +267,11 @@ export interface AgentRunner {
 ├─ 6. 调用 provider.stream(history.toMessages(), { signal })
 │      │
 │      ├─ 每收到 StreamChunk：
-│      │    ├─ 若 done === false：emit StreamChunkEvent { delta }
+│      │    ├─ 若 done === false：emit StreamChunkEvent { delta }（delta 非空时才 emit）
 │      │    │    并累积到 accumulatedText
+│      │    │    [Spec 1.1 扩展：若 thinkingDelta 非空，额外 emit stream_thinking_chunk，见 Spec 1.1 §7]
 │      │    └─ 若 done === true：
+│      │         [Spec 1.1 扩展：若有 accumulatedThinking，先 emit stream_thinking_done，见 Spec 1.1 §7]
 │      │         ├─ stopReason === "stop"：
 │      │         │    emit StreamDoneEvent { totalText, stopReason: "stop" }
 │      │         │    并将 assistant 消息追加到 ConversationHistory
@@ -280,6 +282,7 @@ export interface AgentRunner {
 │      │
 │      └─ 若抛出异常：
 │           ├─ 若 AbortError（用户主动中止）：
+│           │    [Spec 1.1 扩展：若有 accumulatedThinking，先 emit stream_thinking_done，见 Spec 1.1 §7]
 │           │    emit AgentAbortEvent { messageId: replyId, partialText }
 │           └─ 其他错误：
 │                emit StreamErrorEvent { kind, message }
@@ -526,5 +529,7 @@ src/agent/
 | `thinking` | Spec 2 | `{ messageId: string }` | AgentRunner 开始处理，UI 显示"思考中" |
 | `agent_abort` | Spec 2 | `{ messageId: string; partialText: string }` | 用户或系统主动中止流，UI 标记消息为"已中止" |
 | `tool_confirm_required` | Spec 2（接口预留，Spec 5 实现） | `{ toolCallId: string; toolName: string; input: unknown; safetyLevel: "confirm" \| "dangerous" }` | 需要用户确认工具调用；UI 通过 `AgentRunner.confirmToolCall()` 回传决策 |
+| `stream_thinking_chunk` | Spec 1.1 | `{ delta: string; messageId: string }` | 接收到一段 thinking 增量文本；UI 追加至对应消息的 `streamingThinking` |
+| `stream_thinking_done` | Spec 1.1 | `{ totalThinking: string; messageId: string }` | thinking 内容完整接收完毕；UI 将 `streamingThinking` 合并写入 `thinking` |
 
 > 后续 Spec 追加的类型（如 `context_trimmed`、`hook_blocked`、`memory_added` 等）将在对应 Spec 中定义，并在 `src/agent/events.ts` 中追加，不修改上表已有条目。

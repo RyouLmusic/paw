@@ -165,6 +165,7 @@ Overlay (overlay)
 | `PgDn` | 消息区向下翻页 | messages | 否 |
 | `Ctrl+L` | 清空当前对话消息列表 | input | 是（后续 Spec） |
 | `Shift+Enter` | 输入框换行（多行输入） | input | 否 |
+| `t` | 展开 / 折叠当前高亮助手消息的 thinking 内容（无 thinking 内容时无操作） | messages | 否 |
 
 > **Esc 行为依上下文：streaming 进行中 → abort；否则 → 清空输入（input 区）/ 返回 input（messages 区）**
 
@@ -183,10 +184,15 @@ type MessageRole = "user" | "assistant" | "system" | "error"
 type ChatMessage = {
   id: string
   role: MessageRole
-  text: string          // 完整文本（流式完成后的最终内容）
+  text: string            // 完整文本（流式完成后的最终内容）
   streamingText?: string  // 流式进行中的增量文本缓冲，完成后清空
   isStreaming: boolean
-  createdAt: number     // Date.now() 时间戳
+  createdAt: number       // Date.now() 时间戳
+  // ── Spec 1.1 新增：thinking 内容 ──────────────────────────────
+  thinking?: string           // thinking 完整内容（stream_thinking_done 后写入）
+  streamingThinking?: string  // thinking 增量缓冲（stream_thinking_chunk 期间）
+  isThinkingStreaming?: boolean // 默认 undefined / false
+  isThinkingExpanded?: boolean // 用户展开/折叠状态，默认 undefined / false
 }
 ```
 
@@ -198,10 +204,11 @@ MessageArea
     └── 列表循环渲染
         └── MessageItem (per message)
             ├── MessageHeader   [role 标签 + 时间戳]
+            ├── ThinkingBlock   [仅 assistant 消息且含 thinking 内容时渲染，Spec 1.1]
             └── MessageBody
                 ├── PlainText   [普通段落]
                 ├── CodeBlock   [代码块，带语言标签]
-                └── StreamCursor [流式进行时显示的光标 █]
+                └── StreamCursor [流式进行时显示的光标 _]
 ```
 
 **组件 props 概览：**
@@ -415,6 +422,13 @@ Overlay 容器自身处理 `Esc` 键并调用 `onClose`，内容区域由各子�
 | `hook_completed` | `{ hookName: string; exitCode: number; stdout?: string }` | 仅 `exitCode !== 0` 或超时时：显示黄色系统提示："[Hook] {hookName} 执行失败（exitCode: {exitCode}）" |
 | `hook_blocked` | `{ hookName: string; action: string }` | **必须**以红色系统提示条目展示："[Hook 拦截] {action} 被 {hookName} 阻止"，不可作为可选项，与 `stream_error` 同等优先级处理 |
 
+以下事件由 Spec 1.1 定义，本 Spec 消费并渲染：
+
+| type | payload | 渲染方式 |
+|------|---------|---------|
+| `stream_thinking_chunk` | `{ delta: string; messageId: string }` | 追加至对应消息的 `streamingThinking`，`isThinkingStreaming: true`，`ThinkingBlock` 显示 loading 动画 |
+| `stream_thinking_done` | `{ totalThinking: string; messageId: string }` | 写入 `thinking`，清空 `streamingThinking`，`isThinkingStreaming: false`，`ThinkingBlock` 折叠并显示字数提示 |
+
 ---
 
 ### 9. Sidebar 信息展示规范
@@ -443,6 +457,7 @@ src/
     ├── MessageArea.tsx            # 消息区（含滚动逻辑）
     │   ├── MessageItem.tsx        # 单条消息
     │   ├── MessageHeader.tsx      # 消息头（role + 时间戳）
+    │   ├── ThinkingBlock.tsx      # thinking 内容折叠展示（Spec 1.1）
     │   ├── MessageBody.tsx        # 消息体（Markdown 降级渲染）
     │   ├── CodeBlock.tsx          # 代码块
     │   └── StreamCursor.tsx       # 流式光标

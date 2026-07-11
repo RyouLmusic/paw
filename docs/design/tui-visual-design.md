@@ -379,3 +379,47 @@ Overlay 显示时执行进入动画：
 - 布局规则、组件树、尺寸、焦点状态机、快捷键体系 → [Spec 4](../specs/4-20260710-ui-tui-layout.md)
 - 实现任务清单 → [Task 4](../tasks/4-20260710-ui-tui-layout.md)
 - AgentEvent 消费规则 → [Spec 2](../specs/2-20260710-agent-orchestration.md)
+
+---
+
+## 12. ThinkingBlock 视觉规范（Spec 1.1）
+
+`ThinkingBlock` 渲染于助手消息的 `MessageHeader` 与 `MessageBody` 之间，仅在该消息含 thinking 内容时出现。
+
+### 12.1 折叠态
+
+```
+[thinking  v]  (1024 chars)
+```
+
+- 整行使用左侧竖线，颜色 `overlay0`（区别于助手消息正文的 `sky`）
+- 标题文字 `thinking` 颜色 `overlay0`
+- 折叠图标 `v` 颜色 `overlay0`
+- 字数提示 `(N chars)` 颜色 `overlay0, dim`
+- streaming 进行中：折叠图标位置替换为当前帧 Braille loading 字符（`⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏` 序列，颜色 `overlay0`），字数提示不显示
+
+### 12.2 展开态
+
+```
+[thinking  ^]  (1024 chars)
+ 正在思考如何分解这个问题...
+ 首先需要理解用户的需求，然后...
+```
+
+- 标题行同折叠态，折叠图标改为 `^`
+- 内容行：`paddingLeft: 1`，`fg: overlay0`，不做 Markdown 解析，纯文本渲染
+- 内容行与标题行之间无额外间距
+
+### 12.3 边框规则
+
+| 元素 | 边框配置 | 颜色 |
+|------|---------|------|
+| ThinkingBlock 整体 | `border: ["left"], borderStyle: "single"` | `overlay0` |
+
+### 12.4 语义色映射补充
+
+```
+ThinkingBlock 竖线         → overlay0
+ThinkingBlock 文字         → overlay0
+ThinkingBlock loading 动画 → overlay0
+```
