@@ -1,3 +1,4 @@
+在执行任何 AI 操作前，请先读取 /home/rom/workspace/paw/AGENTS.md 文件。
 
 Default to using Bun instead of Node.js.
 
