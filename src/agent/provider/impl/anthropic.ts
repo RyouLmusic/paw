@@ -139,6 +139,11 @@ export class AnthropicProvider implements LLMProvider {
       const decoder = new TextDecoder()
       let buffer = ""
       let stopReason: "stop" | "tool_use" | undefined
+      // 追踪当前活跃 content block 类型。
+      // 注意：当前实现假设 Anthropic SSE 中各 content block 严格顺序，
+      // 不存在交错（即 block_N_stop 一定先于 block_N+1_start）。
+      // 若 Anthropic 将来支持并发 block，需改为 Map<index, type>。
+      let activeBlockType: "text" | "thinking" | null = null
 
       const onAbort = () => {
         reader.cancel().catch(() => {})
@@ -162,14 +167,39 @@ export class AnthropicProvider implements LLMProvider {
 
         for (const evt of events) {
           switch (evt.event) {
+            case "content_block_start": {
+              const blockStart = evt.data as {
+                content_block?: { type?: string }
+              }
+              activeBlockType = blockStart.content_block?.type === "thinking"
+                ? "thinking"
+                : "text"
+              break
+            }
+
             case "content_block_delta": {
-              const delta = evt.data as {
-                delta?: { text?: string; type?: string }
+              if (activeBlockType === "thinking") {
+                const delta = evt.data as {
+                  delta?: { thinking?: string }
+                }
+                const thinking = delta.delta?.thinking
+                if (thinking) {
+                  yield { delta: "", done: false, thinkingDelta: thinking }
+                }
+              } else {
+                const delta = evt.data as {
+                  delta?: { text?: string }
+                }
+                const text = delta.delta?.text
+                if (text) {
+                  yield { delta: text, done: false }
+                }
               }
-              const text = delta.delta?.text
-              if (text) {
-                yield { delta: text, done: false }
-              }
+              break
+            }
+
+            case "content_block_stop": {
+              activeBlockType = null
               break
             }
 
@@ -192,8 +222,6 @@ export class AnthropicProvider implements LLMProvider {
 
             // ping 心跳 —— 忽略
             case "ping":
-            // content_block_start —— 忽略，块开始时不产出文本
-            case "content_block_start":
             case "message_start":
             default:
               break

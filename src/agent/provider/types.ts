@@ -13,10 +13,18 @@ export interface ChatMessage {
 
 /** Stream 过程中产出的单个数据块。 */
 export interface StreamChunk {
+  /** 正文 delta（thinking block 激活时为空字符串）。 */
   delta: string
   done: boolean
   /** 仅当 stream 因 tool_use 请求而停止时存在。 */
   stopReason?: "stop" | "tool_use"
+  /**
+   * thinking block 激活期间的增量文本。
+   * 约束：同一 chunk 中 delta 与 thinkingDelta 互斥——
+   * thinking block 激活期间只填 thinkingDelta，delta 为空字符串；
+   * text block 激活期间只填 delta，不含 thinkingDelta。
+   */
+  thinkingDelta?: string
 }
 
 /**
@@ -77,6 +85,12 @@ export interface PawSettings {
   providers: ProviderConfig[]
   trustedProjectDirs?: string[]
   hooks?: Record<string, string>
+  /**
+   * 是否在 TUI 中展示 ThinkingBlock。
+   * false 时不渲染 ThinkingBlock，但事件仍正常 emit（数据层与展示层分离）。
+   * 默认行为同 true。
+   */
+  showThinking?: boolean
 }
 
 // ── 配置加载结果类型 ──────────────────────────────────────────────────────────

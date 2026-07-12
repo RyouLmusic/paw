@@ -203,6 +203,65 @@ describe("OpenAIProvider", () => {
     expect(results[0].done).toBe(true)
   })
 
+  test("stream: 提取 reasoning_content (OpenAI o 系列 thinking)", async () => {
+    globalThis.fetch = simpleMockResponse({
+      ok: true,
+      status: 200,
+      body: sseStream(
+        `data: {"choices":[{"delta":{"content":"","reasoning_content":"正在思考"},"index":0}]}`,
+        `data: {"choices":[{"delta":{"content":"","reasoning_content":"深入分析"},"index":0}]}`,
+        `data: {"choices":[{"delta":{"content":"","reasoning_content":null},"index":0}]}`,
+        `data: {"choices":[{"delta":{"content":"最终答案"},"index":0}]}`,
+        `data: {"choices":[{"delta":{},"finish_reason":"stop","index":0}]}`,
+        `data: [DONE]`,
+      ),
+    })
+
+    const provider = new OpenAIProvider(sampleConfig)
+    const deltas: string[] = []
+    const thinkingDeltas: string[] = []
+
+    for await (const chunk of provider.stream([
+      { role: "user", content: "hi" },
+    ])) {
+      if (chunk.thinkingDelta) thinkingDeltas.push(chunk.thinkingDelta)
+      if (chunk.delta) deltas.push(chunk.delta)
+      if (chunk.done) {
+        expect(chunk.stopReason).toBe("stop")
+        break
+      }
+    }
+
+    expect(thinkingDeltas).toEqual(["正在思考", "深入分析"])
+    expect(deltas).toEqual(["最终答案"])
+  })
+
+  test("stream: 无 reasoning_content 的 SSE 不产生 thinkingDelta (向后兼容)", async () => {
+    // 与第一个测试相同的 fixture，验证非 thinking 模型不受影响
+    globalThis.fetch = simpleMockResponse({
+      ok: true,
+      status: 200,
+      body: sseStream(
+        `data: {"choices":[{"delta":{"content":"Hello"},"index":0}]}`,
+        `data: {"choices":[{"delta":{"content":" world"},"index":0}]}`,
+        `data: {"choices":[{"delta":{},"finish_reason":"stop","index":0}]}`,
+        `data: [DONE]`,
+      ),
+    })
+
+    const provider = new OpenAIProvider(sampleConfig)
+    const thinkingDeltas: string[] = []
+
+    for await (const chunk of provider.stream([
+      { role: "user", content: "hi" },
+    ])) {
+      if (chunk.thinkingDelta) thinkingDeltas.push(chunk.thinkingDelta)
+      if (chunk.done) break
+    }
+
+    expect(thinkingDeltas).toEqual([]) // 无 thinking 内容
+  })
+
   test("parseStream: P2-17 提前 break 时安全清理", async () => {
     const res = {
       ok: true,

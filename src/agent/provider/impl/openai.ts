@@ -17,9 +17,13 @@ import type { OpenAIProviderConfig } from "../types"
  * 解析 OpenAI 兼容的 SSE 响应体为 AsyncIterable<StreamChunk>。
  *
  * 处理以下格式：
- *   - `data: {"choices":[{"delta":{"content":"..."}}]}`
+ *   - `data: {"choices":[{"delta":{"content":"..."}}]}`（普通文本）
+ *   - `data: {"choices":[{"delta":{"content":"","reasoning_content":"..."}}]}`（thinking 内容，o 系列模型）
+ *   - `data: {"choices":[{"delta":{"reasoning_content":null}}]}`（thinking 结束标记）
  *   - `data: [DONE]`（stream 结束标记）
  *   - 空的 `data:` 心跳行
+ *
+ * 约束：thinkingDelta 与 delta 互斥，同一 chunk 中只含其一。
  *
  * **必须**包含 `try/finally` 块，在 abort 或异常时取消 ReadableStream（P2-17 合规）。
  */
@@ -71,11 +75,18 @@ export async function* parseStream(
         try {
           const parsed = JSON.parse(payload)
           const choice = parsed.choices?.[0]
-          const delta = choice?.delta?.content ?? ""
+          const deltaContent = choice?.delta?.content ?? ""
+          const reasoningContent = choice?.delta?.reasoning_content
           const finishReason = choice?.finish_reason ?? null
 
-          if (delta) {
-            yield { delta, done: false }
+          // 处理 reasoning_content（OpenAI o 系列模型的 thinking 内容）
+          if (reasoningContent && typeof reasoningContent === "string") {
+            yield { delta: "", done: false, thinkingDelta: reasoningContent }
+          }
+
+          // 处理普通正文 delta
+          if (deltaContent) {
+            yield { delta: deltaContent, done: false }
           }
 
           // 当 finish_reason 存在时，stream 结束

@@ -42,12 +42,34 @@ export interface ProviderChangeErrorEvent {
 
 // ── 联合类型（Spec 1）─────────────────────────────────────────────────────────
 
+// ── Spec 1.1：Thinking 内容事件 ────────────────────────────────────────────────
+
+/** 接收到一段 thinking 增量文本。 */
+export interface StreamThinkingChunkEvent {
+  type: "stream_thinking_chunk"
+  /**
+   * 含 messageId 是因为 stream_chunk 暂无此字段（历史设计）。
+   * 若后续 stream_chunk 引入 messageId，两者可统一设计。
+   */
+  payload: { delta: string; messageId: string }
+}
+
+/** thinking 内容完整接收完毕（包括 abort 时的部分内容）。 */
+export interface StreamThinkingDoneEvent {
+  type: "stream_thinking_done"
+  payload: { totalThinking: string; messageId: string }
+}
+
+// ── 联合类型（Spec 1 + Spec 1.1）───────────────────────────────────────────────
+
 export type AgentEvent =
   | StreamChunkEvent
   | StreamDoneEvent
   | StreamErrorEvent
   | ProviderChangedEvent
   | ProviderChangeErrorEvent
+  | StreamThinkingChunkEvent
+  | StreamThinkingDoneEvent
 
 // ── EventBus ─────────────────────────────────────────────────────────────────
 

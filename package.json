@@ -5,7 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "bun run src/main.ts",
-    "start": "bun run src/main.ts"
+    "start": "bun run src/main.ts",
+    "test:provider": "bun run scripts/test-provider.ts",
+    "test:thinking": "bun run scripts/test-thinking.ts"
   },
   "devDependencies": {
     "@types/bun": "1.3.14",
